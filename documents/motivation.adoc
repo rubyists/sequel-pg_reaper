@@ -1,0 +1,13 @@
+= Motivation
+
+To make pgdog rollouts smooth.
+
+Pgdog's shutdown timer is 180s. If the clients all disconnect and reconnect themselves within 120s,
+they are drained from pgdog before the pod terminates, and have already been routed to a fresher pgdog.
+
+Persistent connections also keep load from ever balancing across all the dogs. Recycling connections
+now and then lets the load eventually balance.
+
+== Problem
+
+When pgdog pods cycle in Kubernetes, Sequel can get bad disconnects in the middle of transactions.

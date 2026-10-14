@@ -1,0 +1,17 @@
+[tools]
+# Local dev pin. CI tests a matrix in .github/workflows/main.yaml
+ruby = "4.0.7"
+[env]
+
+[tasks.setup]
+description = "Setup the project"
+# configure gitHooks to use .githooks directory
+run = "git config core.hooksPath .githooks"
+
+[tasks.deps]
+description = "Fetch dependencies"
+run = "bundle install"
+depends = ["setup"]
+
+[hooks]
+enter = [ { task = "deps" } ]

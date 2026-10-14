@@ -1,0 +1,38 @@
+---
+name: Validations
+
+on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
+  workflow_call:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  commit_subjects:
+    name: Validate commit subjects
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Validate commit subjects
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: ./ci/validate_commit_range.sh
+
+  pull_request_title:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate PR title
+        env:
+          PULL_REQUEST_TITLE_REQUIRED: ${{ github.event_name == 'pull_request' }}
+          PULL_REQUEST_TITLE: ${{ github.event.pull_request.title }}
+        run: ./ci/validate_pull_request_title.sh
+
+  ruby_tests:
+    name: Ruby Tests
+    uses: ./.github/workflows/main.yaml

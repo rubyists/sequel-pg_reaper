@@ -1,0 +1,7 @@
+#!/bin/sh
+
+repo_top=$(git rev-parse --show-toplevel) || exit 1
+cd "$repo_top" || exit 1
+
+# Rejects direct commits to main.
+exec "./ci/validate_commit_branch.sh"

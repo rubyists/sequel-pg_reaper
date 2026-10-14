@@ -1,0 +1,38 @@
+= sequel-pg_reaper
+:toc:
+
+A https://sequel.jeremyevans.net/[Sequel] extension that retires pooled connections once they pass a maximum age.
+
+See link:documents/motivation.adoc[the motivation] for why it exists.
+
+== Usage
+
+[source,ruby]
+----
+DB = Sequel.connect(url, connection_max_lifetime: 90)
+DB.extension :pg_reaper
+----
+
+* `connection_max_lifetime` is in seconds and defaults to 120
+* The age is checked as a connection is checked out of the pool, so the cost is one hash lookup
+* A connection that is too old is disconnected and replaced before your code sees it
+* A connection already checked out, such as inside a transaction, is never reaped
+* Idle connections are not reaped by this extension, use Sequel's `connection_validator` for that
+* Single and sharded single pools are not supported
+
+The lifetime can also be changed at runtime with `DB.pool.connection_max_lifetime = 60`.
+
+== Development
+
+[source,sh]
+----
+mise install
+bundle exec rake
+----
+
+Tests use `Sequel.mock`, so no database is needed.
+
+Commits and PR titles must follow https://www.conventionalcommits.org/en/v1.0.0/[Conventional Commits].
+The hooks in `.githooks` enforce it, and `mise run setup` enables them.
+
+Releases are cut by https://github.com/googleapis/release-please[release-please] and published to rubygems.org.

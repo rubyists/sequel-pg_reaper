@@ -1,0 +1,38 @@
+---
+name: Release
+
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  validate:
+    name: Validations
+    uses: ./.github/workflows/validations.yaml
+
+  release:
+    needs: [validate]
+    name: Create a release
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: .release-please-config.json
+          manifest-file: .release-please-manifest.json
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+  publish:
+    if: needs.release.outputs.release_created
+    needs: release
+    name: Build and publish the gem
+    uses: ./.github/workflows/gem.yaml
+    secrets: inherit

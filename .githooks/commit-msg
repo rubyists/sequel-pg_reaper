@@ -1,0 +1,6 @@
+#!/bin/sh
+
+repo_top=$(git rev-parse --show-toplevel) || exit 1
+
+# Enforces Conventional Commits on the commit subject line.
+exec "$repo_top/ci/validate_conventional_subject.sh" "$1"
