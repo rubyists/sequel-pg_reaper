@@ -110,3 +110,30 @@ describe 'pg_reaper configuration' do
     _ { db.extension :pg_reaper }.must_raise Sequel::Error
   end
 end
+
+[%i[connection_validator pg_reaper], %i[pg_reaper connection_validator]].each do |order|
+  describe "pg_reaper with connection_validator loaded #{order.join(" then ")}" do
+    before do
+      @db = Sequel.mock(max_connections: 2)
+      @db.extension(*order)
+      @db.pool.connection_max_lifetime = LIFETIME
+      @db.pool.connection_validation_timeout = -1
+    end
+
+    it 'replaces an old connection that is still valid' do
+      first = @db.synchronize { |c| c }
+      expire
+
+      _(@db.synchronize { |c| c }).wont_be_same_as first
+      _(@db.pool.size).must_equal 1
+    end
+
+    it 'replaces a young connection that fails validation' do
+      first = @db.synchronize { |c| c }
+      @db.define_singleton_method(:valid_connection?) { |conn| !conn.equal?(first) }
+
+      _(@db.synchronize { |c| c }).wont_be_same_as first
+      _(@db.pool.size).must_equal 1
+    end
+  end
+end
