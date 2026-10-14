@@ -1,5 +1,22 @@
 = sequel-pg_reaper
-:toc:
+Tj Vanderpoel (bougyman) <bougyman@users.noreply.github.com>
+:toc: right
+:toclevels: 3
+:sectanchors:
+:icons: font
+:tip-caption: 💡
+:note-caption: 📝
+:experimental:
+:docinfo: private
+:docinfodir: {docdir}
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+:conventional-commits: https://www.conventionalcommits.org/en/v1.0.0/[Conventional Commits]
 
 A https://sequel.jeremyevans.net/[Sequel] extension that retires pooled connections once they pass a maximum age.
 
@@ -17,10 +34,49 @@ DB.extension :pg_reaper
 * The age is checked as a connection is checked out of the pool, so the cost is one hash lookup
 * A connection that is too old is disconnected and replaced before your code sees it
 * A connection already checked out, such as inside a transaction, is never reaped
-* Idle connections are not reaped by this extension, use Sequel's `connection_validator` for that
+* Idle connections are not closed in the background, see <<Idle connections>>
 * Single and sharded single pools are not supported
 
 The lifetime can also be changed at runtime with `DB.pool.connection_max_lifetime = 60`.
+
+== Idle connections
+
+Nothing in this extension, or in Sequel's `connection_validator`, closes an idle socket in the background.
+Both act when a connection is checked out:
+
+* `pg_reaper` replaces any connection older than `connection_max_lifetime`, however long it sat idle
+* `connection_validator` runs a query on connections idle longer than `connection_validation_timeout`
+  and replaces the ones that fail
+
+For a pgdog rollout `pg_reaper` is enough, if two conditions hold that this extension does not enforce:
+
+* The pod's shutdown grace is longer than `connection_max_lifetime`, as with pgdog's 180s against the default 120s
+* New connections stop reaching a pod once it is terminating
+
+Connection age does not tell you a connection is alive. If the grace is shorter than the lifetime, a connection
+opened just before SIGTERM is still young when the pod dies, and it is handed out dead.
+
+Load `connection_validator` as well to cover connections that die for other reasons, such as a pgdog crash
+or a network failure:
+
+[source,ruby]
+----
+DB = Sequel.connect(url, connection_max_lifetime: 120)
+DB.extension :connection_validator, :pg_reaper
+DB.pool.connection_validation_timeout = 30
+----
+
+* `connection_validation_timeout` is an idle threshold, not a detection deadline, so the 30 above is not a promise
+  that a dead connection is found within 30s
+* Only a connection idle longer than the threshold is validated at checkout, and an unused dead connection is not
+  found until something checks it out
+* Set it to `-1` to validate on every checkout, which costs a query each time
+* Load order does not matter
+
+[WARNING]
+----
+A connection checked out for longer than the time left before the pod terminates is not interrupted, keep transactions short
+----
 
 == Development
 
@@ -32,7 +88,7 @@ bundle exec rake
 
 Tests use `Sequel.mock`, so no database is needed.
 
-Commits and PR titles must follow https://www.conventionalcommits.org/en/v1.0.0/[Conventional Commits].
+Commits and PR titles must follow {conventional-commits} to be included in the changelog and release notes.
 The hooks in `.githooks` enforce it, and `mise run setup` enables them.
 
 Releases are cut by https://github.com/googleapis/release-please[release-please] and published to rubygems.org.
